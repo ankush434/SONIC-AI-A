@@ -1,0 +1,7 @@
+{
+  "name": "SONIC AI",
+  "description": "Fast, friendly, and super-intelligent AI assistant created by Ankush Vishwakarma.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

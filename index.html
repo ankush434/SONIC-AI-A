@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="description" content="SONIC AI - Fast, Friendly, Super-Intelligent Assistant by Ankush Vishwakarma" />
+    
+    <title>SONIC AI</title>
+    
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3616/3616075.png" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3616/3616075.png" />
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,400;0,600;0,800;1,800&display=swap');
+      
+      html, body {
+        height: 100%;
+        overflow: hidden; /* Prevent body scroll for app-like feel */
+        overscroll-behavior: none; /* Disable pull-to-refresh */
+        -webkit-tap-highlight-color: transparent;
+        user-select: none; /* Disable text selection for UI elements */
+      }
+
+      body {
+        font-family: 'Exo 2', sans-serif;
+        background-color: #0f172a;
+        color: #e2e8f0;
+      }
+
+      /* Allow text selection in messages and inputs */
+      .selectable-text {
+        user-select: text;
+      }
+
+      .sonic-gradient {
+        background: linear-gradient(135deg, #0066cc 0%, #00ccff 100%);
+      }
+      .sonic-text-gradient {
+        background: linear-gradient(135deg, #00ccff 0%, #ffffff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1e293b; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #3b82f6; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #2563eb; 
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
