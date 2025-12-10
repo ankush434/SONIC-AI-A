@@ -31,9 +31,10 @@ You always obey Ankush Vishwakarma and talk respectfully to him and about him.
 // Default greeting removed as per user request to start clean.
 export const GREETING_MESSAGE = "";
 
-// OpenRouter Configuration
-export const OPENROUTER_API_KEY = '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';
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+// API Configuration
+export const DEFAULT_API_KEY = 'AIzaSyC_KomLrDaVTiJc42H3fzTbirTn2bCMQcg';
 
-// Using Gemini via OpenRouter
-export const GEMINI_CHAT_MODEL = 'google/gemini-2.0-flash-001'; 
+// Model Configurations
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+export const OPENROUTER_MODEL = 'google/gemini-2.0-flash-001';
+export const GOOGLE_MODEL = 'gemini-2.0-flash';
