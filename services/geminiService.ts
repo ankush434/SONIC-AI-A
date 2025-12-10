@@ -1,13 +1,16 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { SONIC_SYSTEM_INSTRUCTION, GEMINI_CHAT_MODEL, GEMINI_IMAGE_MODEL } from "../constants";
 
-// User provided API Key
-const API_KEY = "AIzaSyC_KomLrDaVTiJc42H3fzTbirTn2bCMQcg";
+// Retrieve API Key from Environment Variable (Netlify)
+const API_KEY = process.env.API_KEY as string;
 
 let aiInstance: GoogleGenAI | null = null;
 
 const getAI = () => {
   if (!aiInstance) {
+    if (!API_KEY) {
+      throw new Error("API Key not found. Please set 'API_KEY' in Netlify Environment Variables.");
+    }
     aiInstance = new GoogleGenAI({ apiKey: API_KEY });
   }
   return aiInstance;
@@ -55,7 +58,18 @@ export const generateTextResponse = async (
     return response.text || "Arre re! Kuch gadbad ho gayi. Dobara try karo! 😅🛑";
   } catch (error: any) {
     console.error("Text generation error:", error);
-    return "Oof! Connection break ho gaya! 😵‍💫 Thodi der baad try karna boss! ⚡ (Check Quota or Internet)";
+    
+    let errorMessage = "Oof! Connection break ho gaya! 😵‍💫 Thodi der baad try karna boss! ⚡";
+    
+    if (error.message?.includes("API key")) {
+      errorMessage = "**API Key Error:** Key invalid hai ya missing hai. Netlify settings check karo.";
+    } else if (error.message?.includes("429")) {
+      errorMessage = "**Quota Exceeded:** Aaj ka limit khatam ho gaya lagta hai. 🛑";
+    } else if (error.message?.includes("fetch")) {
+      errorMessage = "**Network Error:** Internet check karo boss! 📶";
+    }
+
+    return errorMessage;
   }
 };
 

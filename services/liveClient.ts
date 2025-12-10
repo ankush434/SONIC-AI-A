@@ -10,8 +10,8 @@ export interface LiveClientCallbacks {
   onError?: (error: any) => void;
 }
 
-// User provided API Key
-const API_KEY = "AIzaSyC_KomLrDaVTiJc42H3fzTbirTn2bCMQcg";
+// Retrieve API Key from Environment Variable (Netlify)
+const API_KEY = process.env.API_KEY as string;
 
 export class SonicLiveClient {
   private ai: GoogleGenAI;
@@ -28,6 +28,13 @@ export class SonicLiveClient {
   private isConnected = false;
 
   constructor(callbacks: LiveClientCallbacks) {
+    if (!API_KEY) {
+        console.error("API Key is missing in LiveClient");
+        // We allow instantiation but connect() will fail or we can throw here.
+        // Throwing here ensures we catch it early in UI.
+        throw new Error("API Key is missing! Please add 'API_KEY' in Netlify Environment Variables.");
+    }
+
     this.ai = new GoogleGenAI({ apiKey: API_KEY });
     this.callbacks = callbacks;
     
