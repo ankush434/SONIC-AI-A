@@ -55,21 +55,6 @@ const App: React.FC = () => {
         console.error("Failed to parse history", e);
       }
     }
-
-    // Handle First Time Greeting
-    const introShown = localStorage.getItem('sonic_intro_shown');
-    if (!introShown) {
-      // If it's the very first time, show greeting but don't save a session yet
-      setMessages([
-        {
-          id: 'init-1',
-          sender: Sender.SONIC,
-          text: GREETING_MESSAGE,
-          timestamp: Date.now(),
-        }
-      ]);
-      localStorage.setItem('sonic_intro_shown', 'true');
-    }
   }, []);
 
   // Save History whenever sessions change

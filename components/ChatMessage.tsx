@@ -18,13 +18,24 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         return;
       }
 
-      const utterance = new SpeechSynthesisUtterance(message.text);
+      // Remove emojis and markdown asterisks for cleaner speech
+      const textToSpeak = message.text
+        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
+        .replace(/\*/g, '')
+        .trim();
+
+      if (!textToSpeak) return;
+
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
       // Try to find a good voice
       const voices = window.speechSynthesis.getVoices();
       const hindiVoice = voices.find(v => v.lang.includes('hi'));
       const englishVoice = voices.find(v => v.lang.includes('en-US') || v.lang.includes('en-GB'));
       
-      if (hindiVoice && /[\u0900-\u097F]/.test(message.text)) {
+      // Basic language detection
+      const isHindi = /[\u0900-\u097F]/.test(textToSpeak);
+
+      if (isHindi && hindiVoice) {
           utterance.voice = hindiVoice;
       } else if (englishVoice) {
           utterance.voice = englishVoice;

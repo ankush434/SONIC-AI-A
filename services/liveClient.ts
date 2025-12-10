@@ -25,7 +25,12 @@ export class SonicLiveClient {
   private isConnected = false;
 
   constructor(callbacks: LiveClientCallbacks) {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        console.error("API_KEY is missing");
+        throw new Error("API_KEY is missing");
+    }
+    this.ai = new GoogleGenAI({ apiKey: apiKey });
     this.callbacks = callbacks;
     
     // Initialize Audio Contexts
@@ -67,7 +72,7 @@ export class SonicLiveClient {
         },
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: SONIC_SYSTEM_INSTRUCTION + "\n\nIMPORTANT: When speaking, use an energetic, fast, and friendly voice. You are Sonic!",
+          systemInstruction: SONIC_SYSTEM_INSTRUCTION + "\n\nIMPORTANT: When speaking, use an energetic, fast, and friendly voice. You are Sonic! Be funny and witty!",
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
           },
@@ -81,12 +86,7 @@ export class SonicLiveClient {
 
   public async disconnect() {
     if (this.sessionPromise) {
-        // There is no explicit .close() on the session object returned by connect() promise directly in docs,
-        // but typically we stop the input stream which closes the connection or we can rely on page unload.
-        // However, the SDK documentation mentions session.close() in rules. 
-        // We will try to resolve the session and close it.
         const session = await this.sessionPromise;
-        // Check if close exists or just stop streams
         // @ts-ignore
         if (session && typeof session.close === 'function') {
              // @ts-ignore
@@ -102,7 +102,6 @@ export class SonicLiveClient {
     if (!this.stream) return;
     
     const source = this.inputAudioContext.createMediaStreamSource(this.stream);
-    // Use ScriptProcessor for raw PCM access (Worklet is better but more complex for single file constraint)
     this.scriptProcessor = this.inputAudioContext.createScriptProcessor(4096, 1, 1);
     
     this.scriptProcessor.onaudioprocess = (e) => {
@@ -110,7 +109,6 @@ export class SonicLiveClient {
       
       const inputData = e.inputBuffer.getChannelData(0);
       
-      // Calculate volume for visualizer
       let sum = 0;
       for (let i = 0; i < inputData.length; i++) {
         sum += inputData[i] * inputData[i];

@@ -4,8 +4,12 @@ import { SONIC_SYSTEM_INSTRUCTION, GEMINI_CHAT_MODEL, GEMINI_IMAGE_MODEL } from 
 let aiInstance: GoogleGenAI | null = null;
 
 const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API_KEY is missing. Please set it in Netlify Environment Variables.");
+  }
   if (!aiInstance) {
-    aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    aiInstance = new GoogleGenAI({ apiKey: apiKey });
   }
   return aiInstance;
 };
@@ -16,45 +20,53 @@ export const generateTextResponse = async (
   imagePart?: { mimeType: string; data: string },
   userName?: string
 ): Promise<string> => {
-  const ai = getAI();
-  
-  let systemInstruction = SONIC_SYSTEM_INSTRUCTION;
-  if (userName) {
-    systemInstruction += `\n\nUSER INFO:\nThe user's name is: ${userName}. Address them by name occasionally to be friendly.`;
-  }
+  try {
+    const ai = getAI();
+    
+    let systemInstruction = SONIC_SYSTEM_INSTRUCTION;
+    if (userName) {
+      systemInstruction += `\n\nUSER INFO:\nThe user's name is: ${userName}. Address them by name and be super friendly/funny with them!`;
+    }
 
-  const chat = ai.chats.create({
-    model: GEMINI_CHAT_MODEL,
-    config: {
-      systemInstruction: systemInstruction,
-    },
-    history: history,
-  });
-
-  const parts: any[] = [{ text: newMessage }];
-  if (imagePart) {
-    parts.push({
-      inlineData: {
-        mimeType: imagePart.mimeType,
-        data: imagePart.data
-      }
+    const chat = ai.chats.create({
+      model: GEMINI_CHAT_MODEL,
+      config: {
+        systemInstruction: systemInstruction,
+      },
+      history: history,
     });
-  }
 
-  const response: GenerateContentResponse = await chat.sendMessage({ 
-    message: { 
-      role: 'user', 
-      parts: parts 
-    } 
-  });
-  
-  return response.text || "";
+    const parts: any[] = [{ text: newMessage }];
+    if (imagePart) {
+      parts.push({
+        inlineData: {
+          mimeType: imagePart.mimeType,
+          data: imagePart.data
+        }
+      });
+    }
+
+    const response: GenerateContentResponse = await chat.sendMessage({ 
+      message: { 
+        role: 'user', 
+        parts: parts 
+      } 
+    });
+    
+    return response.text || "Arre re! Kuch gadbad ho gayi. Dobara try karo! 😅🛑";
+  } catch (error: any) {
+    console.error("Text generation error:", error);
+    if (error.message.includes("API_KEY")) {
+      return "⚠️ **System Error:** API Key is missing via Netlify!\n\nPlease ask Ankush to add the `API_KEY` in Netlify Site Settings > Environment Variables.";
+    }
+    return "Oof! Connection break ho gaya! 😵‍💫 Thodi der baad try karna boss! ⚡";
+  }
 };
 
 export const generateImageResponse = async (prompt: string): Promise<string> => {
-  const ai = getAI();
-  
   try {
+    const ai = getAI();
+    
     const response = await ai.models.generateContent({
       model: GEMINI_IMAGE_MODEL,
       contents: {
