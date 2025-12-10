@@ -31,6 +31,7 @@ const App: React.FC = () => {
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [micVolume, setMicVolume] = useState(0);
   const [isListeningToDictation, setIsListeningToDictation] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   
   // Attachments & User Info
   const [selectedImage, setSelectedImage] = useState<{ mimeType: string, data: string } | null>(null);
@@ -257,17 +258,31 @@ const App: React.FC = () => {
   };
 
   const toggleVoiceMode = async () => {
+    setVoiceError(null);
+    
     if (mode === AppMode.CHAT) {
-      setMode(AppMode.VOICE);
-      if (!liveClientRef.current) {
-        liveClientRef.current = new SonicLiveClient({
-          onOpen: () => setIsLiveConnected(true),
-          onClose: () => setIsLiveConnected(false),
-          onError: () => setIsLiveConnected(false),
-          onVolumeChange: (vol) => setMicVolume(vol)
-        });
+      try {
+        if (!liveClientRef.current) {
+          liveClientRef.current = new SonicLiveClient({
+            onOpen: () => setIsLiveConnected(true),
+            onClose: () => setIsLiveConnected(false),
+            onError: (err) => {
+                setIsLiveConnected(false);
+                setVoiceError("Connection Error: Check API Key");
+            },
+            onVolumeChange: (vol) => setMicVolume(vol)
+          });
+        }
+        setMode(AppMode.VOICE);
+        await liveClientRef.current.connect();
+      } catch (err: any) {
+        console.error("Voice Mode Init Error", err);
+        setMode(AppMode.CHAT);
+        setVoiceError("Missing API Key! Please set it in Netlify.");
+        
+        // Auto-clear error after 5 seconds
+        setTimeout(() => setVoiceError(null), 5000);
       }
-      await liveClientRef.current.connect();
     } else {
       if (liveClientRef.current) {
         await liveClientRef.current.disconnect();
@@ -326,6 +341,14 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col w-full bg-gray-900 overflow-hidden relative" style={{ height: '100dvh' }}>
       
+      {/* Toast Alert for Errors */}
+      {voiceError && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 bg-red-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-slide-up border-2 border-red-400">
+           <i className="fas fa-exclamation-triangle"></i>
+           <span className="font-bold">{voiceError}</span>
+        </div>
+      )}
+
       {/* Sidebar Overlay */}
       {isSidebarOpen && (
         <div className="absolute inset-0 z-50 flex">

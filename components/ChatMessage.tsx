@@ -10,6 +10,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isSonic = message.sender === Sender.SONIC;
   const [isSpeaking, setIsSpeaking] = useState(false);
 
+  const isError = isSonic && (message.text.includes("API Key") || message.text.includes("System Error") || message.text.includes("BOSS, POWER DOWN"));
+
   const handleSpeak = () => {
     if ('speechSynthesis' in window) {
       if (isSpeaking) {
@@ -58,16 +60,22 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         
         {/* Avatar */}
         <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border-2 shadow-lg ${
-          isUser ? 'bg-gray-800 border-gray-600 text-gray-400' : 'bg-blue-600 border-yellow-400 text-white shadow-blue-500/50'
+          isUser 
+          ? 'bg-gray-800 border-gray-600 text-gray-400' 
+          : isError 
+            ? 'bg-red-600 border-red-400 text-white' 
+            : 'bg-blue-600 border-yellow-400 text-white shadow-blue-500/50'
         }`}>
-          <i className={`fas ${isUser ? 'fa-user' : 'fa-bolt'}`}></i>
+          <i className={`fas ${isUser ? 'fa-user' : isError ? 'fa-exclamation' : 'fa-bolt'}`}></i>
         </div>
 
         {/* Bubble */}
         <div className={`relative px-5 py-3 rounded-2xl text-sm md:text-base leading-relaxed shadow-lg ${
           isUser 
             ? 'bg-gray-800 text-gray-100 rounded-br-none border border-gray-700' 
-            : 'bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-bl-none border border-blue-500'
+            : isError
+              ? 'bg-red-900/50 border border-red-500 text-red-100 rounded-bl-none'
+              : 'bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-bl-none border border-blue-500'
         }`}>
           {/* User Attachment (Image) */}
           {message.attachment && (
