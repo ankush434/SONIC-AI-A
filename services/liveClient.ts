@@ -10,6 +10,9 @@ export interface LiveClientCallbacks {
   onError?: (error: any) => void;
 }
 
+// User provided API Key
+const API_KEY = "AIzaSyC_KomLrDaVTiJc42H3fzTbirTn2bCMQcg";
+
 export class SonicLiveClient {
   private ai: GoogleGenAI;
   private inputAudioContext: AudioContext;
@@ -25,14 +28,7 @@ export class SonicLiveClient {
   private isConnected = false;
 
   constructor(callbacks: LiveClientCallbacks) {
-    // Safe access to process.env
-    const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : null;
-    
-    if (!apiKey) {
-        console.error("API_KEY is missing");
-        throw new Error("API_KEY is missing. Please set API_KEY in environment variables.");
-    }
-    this.ai = new GoogleGenAI({ apiKey: apiKey });
+    this.ai = new GoogleGenAI({ apiKey: API_KEY });
     this.callbacks = callbacks;
     
     // Initialize Audio Contexts

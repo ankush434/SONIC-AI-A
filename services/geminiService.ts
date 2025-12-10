@@ -1,17 +1,14 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { SONIC_SYSTEM_INSTRUCTION, GEMINI_CHAT_MODEL, GEMINI_IMAGE_MODEL } from "../constants";
 
+// User provided API Key
+const API_KEY = "AIzaSyC_KomLrDaVTiJc42H3fzTbirTn2bCMQcg";
+
 let aiInstance: GoogleGenAI | null = null;
 
 const getAI = () => {
-  // Safe access to process.env to avoid ReferenceError in some builds
-  const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : null;
-  
-  if (!apiKey) {
-    throw new Error("API_KEY_MISSING");
-  }
   if (!aiInstance) {
-    aiInstance = new GoogleGenAI({ apiKey: apiKey });
+    aiInstance = new GoogleGenAI({ apiKey: API_KEY });
   }
   return aiInstance;
 };
@@ -58,10 +55,7 @@ export const generateTextResponse = async (
     return response.text || "Arre re! Kuch gadbad ho gayi. Dobara try karo! 😅🛑";
   } catch (error: any) {
     console.error("Text generation error:", error);
-    if (error.message.includes("API_KEY") || error.message === "API_KEY_MISSING") {
-      return "⚠️ **BOSS, POWER DOWN!** ⚠️\n\nMera API Key missing hai! 🧠🔌\n\n**Netlify par fix karein:**\n1. Netlify Site Settings > Environment Variables mein jayein.\n2. New Variable add karein:\n   - Key: `API_KEY`\n   - Value: (Aapka Google Gemini API Key)\n3. Site Redeploy karein. 🚀";
-    }
-    return "Oof! Connection break ho gaya! 😵‍💫 Thodi der baad try karna boss! ⚡";
+    return "Oof! Connection break ho gaya! 😵‍💫 Thodi der baad try karna boss! ⚡ (Check Quota or Internet)";
   }
 };
 
