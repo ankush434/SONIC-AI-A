@@ -1,6 +1,5 @@
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import { SONIC_SYSTEM_INSTRUCTION, GEMINI_LIVE_MODEL } from '../constants';
-import { base64ToUint8Array, createPcmBlob, decodeAudioData } from './utils';
+
+import { generateTextResponse } from './geminiService';
 
 export interface LiveClientCallbacks {
   onOpen?: () => void;
@@ -10,178 +9,154 @@ export interface LiveClientCallbacks {
   onError?: (error: any) => void;
 }
 
-// Retrieve API Key from Environment Variable (Netlify)
-const API_KEY = process.env.API_KEY as string;
-
 export class SonicLiveClient {
-  private ai: GoogleGenAI;
-  private inputAudioContext: AudioContext;
-  private outputAudioContext: AudioContext;
-  private inputNode: GainNode;
-  private outputNode: GainNode;
-  private nextStartTime = 0;
-  private sessionPromise: Promise<any> | null = null;
-  private stream: MediaStream | null = null;
-  private scriptProcessor: ScriptProcessorNode | null = null;
-  private sources = new Set<AudioBufferSourceNode>();
   private callbacks: LiveClientCallbacks;
   private isConnected = false;
+  private recognition: any = null;
+  private synth: SpeechSynthesis = window.speechSynthesis;
+  private audioContext: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private microphoneStream: MediaStream | null = null;
+  private visualizerInterval: any = null;
 
   constructor(callbacks: LiveClientCallbacks) {
-    if (!API_KEY) {
-        console.error("API Key is missing in LiveClient");
-        // We allow instantiation but connect() will fail or we can throw here.
-        // Throwing here ensures we catch it early in UI.
-        throw new Error("API Key is missing! Please add 'API_KEY' in Netlify Environment Variables.");
-    }
-
-    this.ai = new GoogleGenAI({ apiKey: API_KEY });
     this.callbacks = callbacks;
     
-    // Initialize Audio Contexts
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    this.inputAudioContext = new AudioContextClass({ sampleRate: 16000 });
-    this.outputAudioContext = new AudioContextClass({ sampleRate: 24000 });
-    
-    this.inputNode = this.inputAudioContext.createGain();
-    this.outputNode = this.outputAudioContext.createGain();
-    this.outputNode.connect(this.outputAudioContext.destination);
+    // Setup Speech Recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = false; // We want turn-taking
+      this.recognition.interimResults = false;
+      this.recognition.lang = 'hi-IN'; // Default to Hindi/India mixed
+    }
   }
 
   public async connect() {
     if (this.isConnected) return;
+    
+    if (!this.recognition) {
+        this.callbacks.onError?.("Speech Recognition not supported in this browser.");
+        return;
+    }
 
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      this.sessionPromise = this.ai.live.connect({
-        model: GEMINI_LIVE_MODEL,
-        callbacks: {
-          onopen: () => {
-            console.log('Sonic Live Connection Opened');
-            this.isConnected = true;
-            this.startAudioInput();
-            this.callbacks.onOpen?.();
-          },
-          onmessage: this.handleMessage.bind(this),
-          onclose: () => {
-            console.log('Sonic Live Connection Closed');
-            this.isConnected = false;
-            this.cleanup();
-            this.callbacks.onClose?.();
-          },
-          onerror: (err) => {
-            console.error('Sonic Live Error:', err);
-            this.callbacks.onError?.(err);
-          },
-        },
-        config: {
-          responseModalities: [Modality.AUDIO],
-          systemInstruction: SONIC_SYSTEM_INSTRUCTION + "\n\nIMPORTANT: When speaking, use an energetic, fast, and friendly voice. You are Sonic! Be funny and witty!",
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
-          },
-        },
-      });
+        // Setup Visualizer (Microphone Volume)
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        this.microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const source = this.audioContext.createMediaStreamSource(this.microphoneStream);
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 256;
+        source.connect(this.analyser);
+        
+        // Start Visualizer Loop
+        const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+        this.visualizerInterval = setInterval(() => {
+            if (this.analyser) {
+                this.analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for(let i=0; i<dataArray.length; i++) sum += dataArray[i];
+                const avg = sum / dataArray.length;
+                this.callbacks.onVolumeChange?.(avg / 128); // Normalize 0-1 (approx)
+            }
+        }, 100);
+
+        // Setup Recognition Events
+        this.recognition.onstart = () => {
+            console.log("Listening...");
+        };
+
+        this.recognition.onend = () => {
+            if (this.isConnected) {
+                // Restart listening if we are still connected and not speaking
+                if (!this.synth.speaking) {
+                    try { this.recognition.start(); } catch(e) {}
+                }
+            }
+        };
+
+        this.recognition.onresult = async (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            if (transcript.trim()) {
+                console.log("User said:", transcript);
+                // Stop listening while processing/speaking
+                this.recognition.stop(); 
+                await this.processUserAudio(transcript);
+            }
+        };
+
+        this.isConnected = true;
+        this.callbacks.onOpen?.();
+        this.recognition.start();
+
     } catch (error) {
-      console.error("Failed to connect live client:", error);
-      this.callbacks.onError?.(error);
+        console.error("Live Client Connect Error", error);
+        this.callbacks.onError?.(error);
     }
+  }
+
+  private async processUserAudio(text: string) {
+      try {
+          const responseText = await generateTextResponse([], text, undefined, localStorage.getItem('sonic_user_name') || undefined);
+          this.speak(responseText);
+      } catch (error) {
+          console.error("Processing error", error);
+          this.speak("Sorry boss, connection error.");
+      }
+  }
+
+  private speak(text: string) {
+      if (this.synth.speaking) this.synth.cancel();
+
+      // Clean text
+      const cleanText = text.replace(/[*#]/g, '').replace(/\[\[.*?\]\]/g, '');
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      
+      // Select Voice
+      const voices = this.synth.getVoices();
+      const hindiVoice = voices.find(v => v.lang.includes('hi'));
+      const englishVoice = voices.find(v => v.lang.includes('en-US'));
+      
+      if (hindiVoice && /[\u0900-\u097F]/.test(cleanText)) {
+          utterance.voice = hindiVoice;
+      } else if (englishVoice) {
+          utterance.voice = englishVoice;
+      }
+
+      utterance.rate = 1.1; // Sonic speed
+
+      utterance.onend = () => {
+          if (this.isConnected) {
+              try { this.recognition.start(); } catch(e){}
+          }
+      };
+
+      this.synth.speak(utterance);
   }
 
   public async disconnect() {
-    if (this.sessionPromise) {
-        const session = await this.sessionPromise;
-        // @ts-ignore
-        if (session && typeof session.close === 'function') {
-             // @ts-ignore
-            session.close();
-        }
-    }
-    this.cleanup();
     this.isConnected = false;
+    
+    if (this.recognition) {
+        this.recognition.onend = null;
+        this.recognition.stop();
+    }
+    
+    if (this.synth.speaking) {
+        this.synth.cancel();
+    }
+
+    if (this.visualizerInterval) clearInterval(this.visualizerInterval);
+    
+    if (this.microphoneStream) {
+        this.microphoneStream.getTracks().forEach(t => t.stop());
+    }
+    
+    if (this.audioContext) {
+        this.audioContext.close();
+    }
+
     this.callbacks.onClose?.();
-  }
-
-  private startAudioInput() {
-    if (!this.stream) return;
-    
-    const source = this.inputAudioContext.createMediaStreamSource(this.stream);
-    this.scriptProcessor = this.inputAudioContext.createScriptProcessor(4096, 1, 1);
-    
-    this.scriptProcessor.onaudioprocess = (e) => {
-      if (!this.isConnected) return;
-      
-      const inputData = e.inputBuffer.getChannelData(0);
-      
-      let sum = 0;
-      for (let i = 0; i < inputData.length; i++) {
-        sum += inputData[i] * inputData[i];
-      }
-      const volume = Math.sqrt(sum / inputData.length);
-      this.callbacks.onVolumeChange?.(volume);
-
-      const pcmBlob = createPcmBlob(inputData);
-      
-      if (this.sessionPromise) {
-        this.sessionPromise.then((session) => {
-          session.sendRealtimeInput({ media: pcmBlob });
-        });
-      }
-    };
-
-    source.connect(this.scriptProcessor);
-    this.scriptProcessor.connect(this.inputAudioContext.destination);
-  }
-
-  private async handleMessage(message: LiveServerMessage) {
-    const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-    
-    if (base64Audio) {
-      this.nextStartTime = Math.max(this.nextStartTime, this.outputAudioContext.currentTime);
-      
-      const audioBuffer = await decodeAudioData(
-        base64ToUint8Array(base64Audio),
-        this.outputAudioContext
-      );
-      
-      const source = this.outputAudioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(this.outputNode);
-      
-      source.addEventListener('ended', () => {
-        this.sources.delete(source);
-      });
-      
-      source.start(this.nextStartTime);
-      this.nextStartTime += audioBuffer.duration;
-      this.sources.add(source);
-      
-      this.callbacks.onAudioData?.(source);
-    }
-
-    const interrupted = message.serverContent?.interrupted;
-    if (interrupted) {
-      this.sources.forEach(s => {
-        try { s.stop(); } catch(e){}
-      });
-      this.sources.clear();
-      this.nextStartTime = 0;
-    }
-  }
-
-  private cleanup() {
-    if (this.stream) {
-      this.stream.getTracks().forEach(track => track.stop());
-      this.stream = null;
-    }
-    if (this.scriptProcessor) {
-      this.scriptProcessor.disconnect();
-      this.scriptProcessor = null;
-    }
-    this.sources.forEach(s => {
-        try { s.stop(); } catch(e){}
-    });
-    this.sources.clear();
   }
 }

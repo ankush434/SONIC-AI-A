@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import ChatMessage from './components/ChatMessage';
 import PulseVisualizer from './components/PulseVisualizer';
@@ -205,7 +206,7 @@ const App: React.FC = () => {
           displayText = rawResponse.replace(/\[\[NAME_SAVED:(.+?)\]\]/, '').trim();
       }
 
-      // Image Generation Logic
+      // Image Generation Logic (Simulated Text Response for now as OpenRouter handles text better)
       const imagePromptMatch = displayText.match(/\*\*Image Prompt:\*\*\s*(.*)/i);
       
       let finalMessage: Message = {
@@ -217,22 +218,9 @@ const App: React.FC = () => {
       };
 
       if (imagePromptMatch) {
-        const imagePrompt = imagePromptMatch[1].trim();
-        // Update thinking state for image
-        setMessages(prev => prev.map(m => m.id === thinkingMsgId ? { ...finalMessage, isThinking: true, text: finalMessage.text + "\n(Generating image...)" } : m));
-        
-        try {
-            const base64Image = await generateImageResponse(imagePrompt);
-            if (base64Image) {
-                finalMessage.imageSrc = base64Image;
-                finalMessage.text = finalMessage.text.replace("\n(Generating image...)", "");
-            } else {
-                 finalMessage.text = "Sorry, I couldn't generate the image this time. " + finalMessage.text;
-            }
-        } catch (imgErr) {
-            console.error(imgErr);
-            finalMessage.text = "Error generating image. " + finalMessage.text;
-        }
+         // OpenRouter limitation: Direct image generation disabled in this mode to prevent crashes.
+         // We will just show the text prompt or a note.
+         finalMessage.text += "\n\n(Note: Image generation is currently paused in this API mode. But that's a cool idea! ⚡)";
       }
 
       // Final update
@@ -245,7 +233,7 @@ const App: React.FC = () => {
       const errorMsg: Message = {
         id: thinkingMsgId,
         sender: Sender.SONIC,
-        text: "Gotta run fast! But I hit a snag. Try again?",
+        text: "Gotta run fast! But I hit a snag. Try again? " + (error instanceof Error ? error.message : ""),
         timestamp: Date.now(),
         isThinking: false
       };
@@ -267,8 +255,9 @@ const App: React.FC = () => {
             onOpen: () => setIsLiveConnected(true),
             onClose: () => setIsLiveConnected(false),
             onError: (err) => {
+                console.log("Voice Error", err);
                 setIsLiveConnected(false);
-                setVoiceError("Connection Error: Check API Key");
+                setVoiceError("Microphone Error or Browser Not Supported.");
             },
             onVolumeChange: (vol) => setMicVolume(vol)
           });
@@ -278,9 +267,7 @@ const App: React.FC = () => {
       } catch (err: any) {
         console.error("Voice Mode Init Error", err);
         setMode(AppMode.CHAT);
-        setVoiceError("Missing API Key! Please set it in Netlify.");
-        
-        // Auto-clear error after 5 seconds
+        setVoiceError("Voice mode failed to start.");
         setTimeout(() => setVoiceError(null), 5000);
       }
     } else {
@@ -555,7 +542,7 @@ const App: React.FC = () => {
           <div className="flex-1 flex flex-col items-center justify-center z-10 p-8">
             <div className="text-center mb-12">
                <h2 className="text-3xl md:text-5xl font-black italic text-white mb-4 drop-shadow-lg">
-                 {isLiveConnected ? "LISTENING..." : "CONNECTING..."}
+                 {isLiveConnected ? "LISTENING..." : "INITIALIZING..."}
                </h2>
                <p className="text-blue-300 text-lg">Speak naturally. Sonic is listening.</p>
             </div>

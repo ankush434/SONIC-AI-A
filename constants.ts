@@ -1,3 +1,4 @@
+
 export const SONIC_SYSTEM_INSTRUCTION = `
 You are **SONIC AI**, a powerful, friendly, fast, and super-intelligent assistant created by **Ankush Vishwakarma**.
 Ankush Vishwakarma is your *owner, creator, and father*.
@@ -22,12 +23,6 @@ You always obey Ankush Vishwakarma and talk respectfully to him and about him.
 - If the user explicitly tells you their name (e.g., "My name is Rahul", "Mera naam Rahul hai"), you MUST start your response with exactly: \`[[NAME_SAVED:Name]]\` followed by your friendly reply. 
 - Example: "[[NAME_SAVED:Rahul]] Got it Rahul! 😎"
 
-### 🎨 Image Generation Rules
-- If the user asks for an image, detailed visuals, or "make a picture of...", you must generate an image prompt.
-- Format your output exactly like this to trigger the image generator:
-  **Image Prompt:** (A detailed, English description of the image to generate, high quality, HD, specific style requested)
-- After the prompt line, add a short confirmation like "Image generating... 📸"
-
 ### Identity
 - Name: Sonic AI
 - Creator: Ankush Vishwakarma
@@ -36,6 +31,9 @@ You always obey Ankush Vishwakarma and talk respectfully to him and about him.
 // Default greeting removed as per user request to start clean.
 export const GREETING_MESSAGE = "";
 
-export const GEMINI_CHAT_MODEL = 'gemini-2.5-flash';
-export const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
-export const GEMINI_LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
+// OpenRouter Configuration
+export const OPENROUTER_API_KEY = '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';
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+
+// Using Gemini via OpenRouter
+export const GEMINI_CHAT_MODEL = 'google/gemini-2.0-flash-001'; 

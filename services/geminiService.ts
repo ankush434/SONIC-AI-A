@@ -1,19 +1,10 @@
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { SONIC_SYSTEM_INSTRUCTION, GEMINI_CHAT_MODEL, GEMINI_IMAGE_MODEL } from "../constants";
 
-// Retrieve API Key from Environment Variable (Netlify)
-const API_KEY = process.env.API_KEY as string;
+import { SONIC_SYSTEM_INSTRUCTION, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, GEMINI_CHAT_MODEL } from "../constants";
 
-let aiInstance: GoogleGenAI | null = null;
-
-const getAI = () => {
-  if (!aiInstance) {
-    if (!API_KEY) {
-      throw new Error("API Key not found. Please set 'API_KEY' in Netlify Environment Variables.");
-    }
-    aiInstance = new GoogleGenAI({ apiKey: API_KEY });
-  }
-  return aiInstance;
+// Helper to get effective API Key
+const getApiKey = () => {
+  // Use the hardcoded key from constants if available, otherwise check env or local storage
+  return OPENROUTER_API_KEY || localStorage.getItem('sonic_api_key') || process.env.API_KEY || "";
 };
 
 export const generateTextResponse = async (
@@ -22,51 +13,87 @@ export const generateTextResponse = async (
   imagePart?: { mimeType: string; data: string },
   userName?: string
 ): Promise<string> => {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error("API Key Missing! Please add 'API_KEY' in Netlify or Settings.");
+  }
+
   try {
-    const ai = getAI();
-    
     let systemInstruction = SONIC_SYSTEM_INSTRUCTION;
     if (userName) {
       systemInstruction += `\n\nUSER INFO:\nThe user's name is: ${userName}. Address them by name and be super friendly/funny with them!`;
     }
 
-    const chat = ai.chats.create({
-      model: GEMINI_CHAT_MODEL,
-      config: {
-        systemInstruction: systemInstruction,
-      },
-      history: history,
+    // Convert history to OpenRouter/OpenAI format
+    const messages: any[] = [
+      { role: "system", content: systemInstruction }
+    ];
+
+    history.forEach(msg => {
+      const contentParts: any[] = [];
+      msg.parts.forEach(part => {
+        if (part.text) contentParts.push({ type: "text", text: part.text });
+        if (part.inlineData) {
+           contentParts.push({ 
+             type: "image_url", 
+             image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` } 
+           });
+        }
+      });
+      if (contentParts.length > 0) {
+        messages.push({
+          role: msg.role === 'model' ? 'assistant' : 'user',
+          content: contentParts
+        });
+      }
     });
 
-    const parts: any[] = [{ text: newMessage }];
+    // Add new message
+    const newContentParts: any[] = [{ type: "text", text: newMessage }];
     if (imagePart) {
-      parts.push({
-        inlineData: {
-          mimeType: imagePart.mimeType,
-          data: imagePart.data
-        }
+      newContentParts.push({
+        type: "image_url",
+        image_url: { url: `data:${imagePart.mimeType};base64,${imagePart.data}` }
       });
     }
 
-    const response: GenerateContentResponse = await chat.sendMessage({ 
-      message: { 
-        role: 'user', 
-        parts: parts 
-      } 
+    messages.push({
+      role: "user",
+      content: newContentParts
     });
-    
-    return response.text || "Arre re! Kuch gadbad ho gayi. Dobara try karo! 😅🛑";
+
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://sonic-ai.netlify.app", // Required by OpenRouter
+        "X-Title": "Sonic AI"
+      },
+      body: JSON.stringify({
+        model: GEMINI_CHAT_MODEL,
+        messages: messages,
+        temperature: 0.8,
+      })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "Arre re! Kuch gadbad ho gayi. Dobara try karo! 😅🛑";
+
   } catch (error: any) {
     console.error("Text generation error:", error);
     
     let errorMessage = "Oof! Connection break ho gaya! 😵‍💫 Thodi der baad try karna boss! ⚡";
     
-    if (error.message?.includes("API key")) {
-      errorMessage = "**API Key Error:** Key invalid hai ya missing hai. Netlify settings check karo.";
+    if (error.message?.includes("401")) {
+      errorMessage = "**API Key Error:** Key invalid hai. Check constants.ts or settings.";
     } else if (error.message?.includes("429")) {
-      errorMessage = "**Quota Exceeded:** Aaj ka limit khatam ho gaya lagta hai. 🛑";
-    } else if (error.message?.includes("fetch")) {
-      errorMessage = "**Network Error:** Internet check karo boss! 📶";
+      errorMessage = "**Quota Exceeded:** Limit over ho gayi hai OpenRouter par. 🛑";
     }
 
     return errorMessage;
@@ -74,30 +101,9 @@ export const generateTextResponse = async (
 };
 
 export const generateImageResponse = async (prompt: string): Promise<string> => {
-  try {
-    const ai = getAI();
-    
-    const response = await ai.models.generateContent({
-      model: GEMINI_IMAGE_MODEL,
-      contents: {
-        parts: [{ text: prompt }]
-      },
-      config: {
-        // No responseMimeType/responseSchema for this model
-      }
-    });
-
-    if (response.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData && part.inlineData.data) {
-                return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-            }
-        }
-    }
-    
+    // OpenRouter is primarily Text LLM. 
+    // Image generation is not natively supported via the standard chat endpoint in the same way.
+    // We return empty string to let the UI handle it (or show a text description).
+    console.warn("Image generation via OpenRouter not implemented in this version.");
     return "";
-  } catch (error) {
-    console.error("Image generation error:", error);
-    throw error;
-  }
 };
